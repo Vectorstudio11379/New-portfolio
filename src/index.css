@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Space Mono', monospace;
+    --font-serif: 'Space Mono', monospace;
+    --font-mono: 'Space Mono', monospace;
+    --accent-crimson: #b91f2a;
+    --accent-crimson-light: #e63946;
+    --accent-crimson-glow: rgba(185, 31, 42, 0.4);
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  ::selection {
+    background-color: #b91f2a;
+    color: #ffffff;
+  }
+
+  html, body {
+    background-color: #000000;
+    color: #ffffff;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: 'Space Mono', monospace;
+    scroll-behavior: smooth;
+  }
+
+  /* Custom subtle scrollbar with crimson highlight */
+  ::-webkit-scrollbar {
+    width: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #000;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #27272a;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #b91f2a;
+  }
+}
+
+/* Watermark typography */
+.font-anton {
+  font-family: 'Anton SC', sans-serif;
+}
+
+.font-space {
+  font-family: 'Space Mono', monospace;
+}
+
+/* Lenis smooth scroll classes */
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* Dot grid overlay pattern */
+.bg-dot-grid {
+  background-image: radial-gradient(#ffffff 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Watermark text gradient */
+.watermark-gradient {
+  background: radial-gradient(circle, rgba(142, 127, 148, 0) 0%, #8E7F94 70%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
