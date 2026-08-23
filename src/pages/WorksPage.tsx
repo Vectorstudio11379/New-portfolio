@@ -4,6 +4,7 @@ import { PROJECTS_DATA } from '../data/portfolioData';
 import { Project } from '../types';
 import { Search, ExternalLink, ArrowUpRight, Filter, Sparkles, Layers, Eye } from 'lucide-react';
 import { TiltCard } from '../components/gsap/TiltCard';
+import { ProjectImage } from '../components/ProjectImage';
 
 interface WorksPageProps {
   onSelectProject: (project: Project) => void;
@@ -179,19 +180,14 @@ export const WorksPage: React.FC<WorksPageProps> = ({
                   >
                     {/* Image Container */}
                     <div className="relative h-52 w-full bg-zinc-950 overflow-hidden">
-                      {project.images?.[0] ? (
-                        <img
-                          src={project.images[0]}
-                          alt={project.title}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white/30 text-xs font-mono">
-                          Preview Unavailable
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-80" />
+                      <ProjectImage
+                        src={project.images?.[0]}
+                        alt={project.title}
+                        category={project.category}
+                        client={project.client}
+                        className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-80 pointer-events-none" />
 
                       {/* Top Badges */}
                       <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">

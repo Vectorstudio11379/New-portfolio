@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ExternalLink, Sparkles, CheckCircle2, ChevronRight, Layers, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Project } from '../types';
+import { ProjectImage } from './ProjectImage';
 
 interface ProjectModalProps {
   project: Project | null;
@@ -68,9 +69,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
             {images.length > 0 && (
               <div className="space-y-3">
                 <div className="relative w-full aspect-[16/9] bg-zinc-900 rounded-xl overflow-hidden border border-white/10">
-                  <img
+                  <ProjectImage
                     src={images[activeImageIndex]}
                     alt={`${project.title} Preview ${activeImageIndex + 1}`}
+                    category={project.category}
+                    client={project.client}
                     className="w-full h-full object-cover object-top"
                   />
                   {images.length > 1 && (
@@ -107,9 +110,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
                             : 'border-white/10 opacity-60 hover:opacity-100'
                         }`}
                       >
-                        <img
+                        <ProjectImage
                           src={img}
                           alt="Thumbnail"
+                          category={project.category}
+                          client={project.client}
                           className="w-full h-full object-cover"
                         />
                       </button>

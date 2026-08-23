@@ -7,6 +7,7 @@ import { Project } from '../types';
 import { ArrowUpRight, Sparkles, ExternalLink, ArrowRight, Layers, Cpu, Code2, Globe } from 'lucide-react';
 import { TiltCard } from '../components/gsap/TiltCard';
 import { Magnetic } from '../components/gsap/Magnetic';
+import { ProjectImage } from '../components/ProjectImage';
 
 interface HomePageProps {
   entranceComplete: boolean;
@@ -107,20 +108,15 @@ export const HomePage: React.FC<HomePageProps> = ({
               >
                 {/* Image Preview */}
                 <div className="relative h-40 sm:h-48 w-full overflow-hidden bg-zinc-950">
-                  {project.images?.[0] ? (
-                    <img
-                      src={project.images[0]}
-                      alt={project.title}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white/30 text-xs font-mono">
-                      No Preview
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-900/90 via-transparent to-transparent" />
-                  <span className="absolute top-2.5 sm:top-3 right-2.5 sm:right-3 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-black/75 backdrop-blur-md border border-[#b91f2a]/40 text-[9px] sm:text-[10px] uppercase font-mono tracking-wider text-[#ff6b76]">
+                  <ProjectImage
+                    src={project.images?.[0]}
+                    alt={project.title}
+                    category={project.category}
+                    client={project.client}
+                    className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-900/90 via-transparent to-transparent pointer-events-none" />
+                  <span className="absolute top-2.5 sm:top-3 right-2.5 sm:right-3 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-black/75 backdrop-blur-md border border-[#b91f2a]/40 text-[9px] sm:text-[10px] uppercase font-mono tracking-wider text-[#ff6b76] pointer-events-none">
                     {project.category}
                   </span>
                 </div>
