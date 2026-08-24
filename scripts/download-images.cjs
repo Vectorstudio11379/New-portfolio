@@ -102,6 +102,9 @@ function ensurePingPongVideo() {
         { stdio: 'inherit' }
       );
     }
+    if (!fs.existsSync(path.join(videoDir, 'hero-poster.jpg'))) {
+      execSync(`ffmpeg -y -i "${videoPath}" -vframes 1 -q:v 2 "${path.join(videoDir, 'hero-poster.jpg')}"`, { stdio: 'inherit' });
+    }
     console.log('[download-images] hero-loop video assets verified successfully!');
   } catch (err) {
     console.warn('[download-images] FFmpeg error:', err.message);

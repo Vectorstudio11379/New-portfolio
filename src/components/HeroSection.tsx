@@ -9,8 +9,11 @@ interface HeroSectionProps {
   onExploreClick: () => void;
 }
 
+const CLOUDFRONT_VIDEO_URL =
+  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_083515_290e5a10-0b95-41af-a5e2-32b6389baa4d.mp4';
 const HERO_LOOP_VIDEO_URL = '/video/hero-loop.mp4';
 const HERO_LOOP_MOBILE_VIDEO_URL = '/video/hero-loop-mobile.mp4';
+const HERO_POSTER_URL = '/video/hero-poster.jpg';
 
 function getIsMobile(): boolean {
   if (typeof window === 'undefined') return false;
@@ -30,7 +33,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const lastMouseXRef = useRef<number | null>(null);
   const targetTimeRef = useRef<number>(0);
   const isSeekingRef = useRef<boolean>(false);
-  const [videoDuration, setVideoDuration] = useState<number>(0);
+  const [videoDuration, setVideoDuration] = useState<number>(8);
   const [currentTimeDisplay, setCurrentTimeDisplay] = useState<string>('00:00.0');
 
   const [isMobile, setIsMobile] = useState<boolean>(getIsMobile);
@@ -39,23 +42,80 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   );
   const [isVideoLoaded, setIsVideoLoaded] = useState<boolean>(false);
 
-  // Detect mobile device
+  // Preload video as Blob to bypass byte-range header issues on iOS Safari and mobile WebKit
+  useEffect(() => {
+    let isCancelled = false;
+    let createdBlobUrl: string | null = null;
+
+    async function loadVideoBlob() {
+      const primaryUrl = isMobile ? HERO_LOOP_MOBILE_VIDEO_URL : HERO_LOOP_VIDEO_URL;
+      const secondaryUrl = HERO_LOOP_VIDEO_URL;
+
+      try {
+        const res = await fetch(primaryUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          if (!isCancelled && blob.size > 50000) {
+            createdBlobUrl = URL.createObjectURL(blob);
+            setVideoSrc(createdBlobUrl);
+            return;
+          }
+        }
+      } catch {
+        // Continue to secondary check
+      }
+
+      if (primaryUrl !== secondaryUrl) {
+        try {
+          const res2 = await fetch(secondaryUrl);
+          if (res2.ok) {
+            const blob2 = await res2.blob();
+            if (!isCancelled && blob2.size > 50000) {
+              createdBlobUrl = URL.createObjectURL(blob2);
+              setVideoSrc(createdBlobUrl);
+              return;
+            }
+          }
+        } catch {
+          // Fallback to CloudFront
+        }
+      }
+
+      // If local assets fail (e.g. remote deployment without prebuilt assets), use CloudFront
+      if (!isCancelled) {
+        setVideoSrc(CLOUDFRONT_VIDEO_URL);
+      }
+    }
+
+    loadVideoBlob();
+
+    return () => {
+      isCancelled = true;
+      if (createdBlobUrl) {
+        URL.revokeObjectURL(createdBlobUrl);
+      }
+    };
+  }, [isMobile]);
+
+  // Detect mobile device on resize
   useEffect(() => {
     const checkMobile = () => {
       const mobile = getIsMobile();
       setIsMobile(mobile);
-      setVideoSrc(mobile ? HERO_LOOP_MOBILE_VIDEO_URL : HERO_LOOP_VIDEO_URL);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Handle video error (e.g. if 720p fails, fallback to 1080p loop)
+  // Handle video error with robust fallback cascade
   const handleVideoError = () => {
     if (videoSrc === HERO_LOOP_MOBILE_VIDEO_URL) {
       console.warn('Falling back to 1080p hero loop');
       setVideoSrc(HERO_LOOP_VIDEO_URL);
+    } else if (videoSrc !== CLOUDFRONT_VIDEO_URL) {
+      console.warn('Falling back to primary CloudFront stream');
+      setVideoSrc(CLOUDFRONT_VIDEO_URL);
     }
   };
 
@@ -248,6 +308,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         key={videoSrc}
         ref={videoRef}
         src={videoSrc}
+        poster={HERO_POSTER_URL}
         playsInline
         muted
         autoPlay={isMobile}
