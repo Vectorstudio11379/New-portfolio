@@ -34,6 +34,11 @@ const ASSETS = [
   '/images/projects/project-01/image-03.jpg'
 ];
 
+const VIDEO_ASSET = {
+  path: '/video/hero-loop.mp4',
+  remoteUrl: 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_083515_290e5a10-0b95-41af-a5e2-32b6389baa4d.mp4'
+};
+
 function downloadFile(relPath) {
   return new Promise((resolve) => {
     const targetUrl = REMOTE_BASE_URL + relPath;
@@ -73,6 +78,13 @@ async function main() {
   for (const asset of ASSETS) {
     await downloadFile(asset);
   }
+  
+  const videoPath = path.join(process.cwd(), 'public', VIDEO_ASSET.path);
+  if (!fs.existsSync(videoPath) || fs.statSync(videoPath).size === 0) {
+    console.log('[download-images] Downloading fallback video asset...');
+    await downloadFile(VIDEO_ASSET.path);
+  }
+  
   console.log('[download-images] Finished downloading all assets.');
 }
 

@@ -11,6 +11,7 @@ interface HeroSectionProps {
 
 const HERO_VIDEO_URL =
   'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_083515_290e5a10-0b95-41af-a5e2-32b6389baa4d.mp4';
+const HERO_LOOP_VIDEO_URL = '/video/hero-loop.mp4';
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   entranceComplete,
@@ -24,14 +25,70 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [currentTimeDisplay, setCurrentTimeDisplay] = useState<string>('00:00.0');
 
-  // Video loaded metadata
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      const isTouchOrSmall =
+        window.innerWidth < 768 ||
+        'ontouchstart' in window ||
+        navigator.maxTouchPoints > 0;
+      setIsMobile(isTouchOrSmall);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Handle loaded metadata & initial playback mode
   const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-      setVideoDuration(videoRef.current.duration || 10);
+    const video = videoRef.current;
+    if (video) {
+      setVideoDuration(video.duration || 10);
+      if (isMobile) {
+        // Native continuous hardware playback at slow, majestic speed (0.55x)
+        video.playbackRate = 0.55;
+        video.muted = true;
+        video.playsInline = true;
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+        video.currentTime = 0;
+      }
     }
   };
+
+  // On mobile: play continuous ping-pong video with smooth time updates
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (!isMobile) {
+      video.pause();
+      return;
+    }
+
+    video.muted = true;
+    video.playsInline = true;
+    video.playbackRate = 0.55;
+
+    const handleTimeUpdate = () => {
+      const cur = video.currentTime;
+      const mins = Math.floor(cur / 60);
+      const secs = (cur % 60).toFixed(1);
+      setCurrentTimeDisplay(
+        `${mins.toString().padStart(2, '0')}:${secs.padStart(4, '0')}`
+      );
+    };
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.play().catch(() => {});
+
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [isMobile]);
 
   // Safe seek chaining using the `seeked` event
   const performNextSeek = useCallback(() => {
@@ -139,18 +196,20 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     <section
       id="hero"
       ref={containerRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className="relative w-full h-screen h-[100dvh] overflow-hidden bg-black flex flex-col justify-between select-none cursor-ew-resize"
+      onMouseMove={!isMobile ? handleMouseMove : undefined}
+      onMouseLeave={!isMobile ? handleMouseLeave : undefined}
+      className={`relative w-full h-screen h-[100dvh] overflow-hidden bg-black flex flex-col justify-between select-none ${
+        isMobile ? 'cursor-default' : 'cursor-ew-resize'
+      }`}
     >
-      {/* 1. Background Video (paused, mouse scrubbed) */}
+      {/* 1. Background Video (paused + scrubbed on desktop, smooth automatic continuous scan on mobile) */}
       <video
         ref={videoRef}
-        src={HERO_VIDEO_URL}
+        src={isMobile ? HERO_LOOP_VIDEO_URL : HERO_VIDEO_URL}
         playsInline
         muted
+        autoPlay={isMobile}
+        loop={isMobile}
         preload="auto"
         onLoadedMetadata={handleLoadedMetadata}
         className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0 brightness-[0.85] contrast-[1.1]"
