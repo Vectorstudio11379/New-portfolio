@@ -13,6 +13,15 @@ const HERO_VIDEO_URL =
   'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_083515_290e5a10-0b95-41af-a5e2-32b6389baa4d.mp4';
 const HERO_LOOP_VIDEO_URL = '/video/hero-loop.mp4';
 
+function getIsMobile(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.innerWidth < 768 ||
+    'ontouchstart' in window ||
+    navigator.maxTouchPoints > 0
+  );
+}
+
 export const HeroSection: React.FC<HeroSectionProps> = ({
   entranceComplete,
   onExploreClick,
@@ -25,33 +34,50 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [currentTimeDisplay, setCurrentTimeDisplay] = useState<string>('00:00.0');
 
-  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(getIsMobile);
+  const [videoSrc, setVideoSrc] = useState<string>(() =>
+    getIsMobile() ? HERO_LOOP_VIDEO_URL : HERO_VIDEO_URL
+  );
+  const [isVideoLoaded, setIsVideoLoaded] = useState<boolean>(false);
 
   // Detect mobile device
   useEffect(() => {
     const checkMobile = () => {
-      const isTouchOrSmall =
-        window.innerWidth < 768 ||
-        'ontouchstart' in window ||
-        navigator.maxTouchPoints > 0;
-      setIsMobile(isTouchOrSmall);
+      const mobile = getIsMobile();
+      setIsMobile(mobile);
+      setVideoSrc(mobile ? HERO_LOOP_VIDEO_URL : HERO_VIDEO_URL);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Handle video error (e.g. if local loop video 404s on remote host, fallback to cloudfront)
+  const handleVideoError = () => {
+    if (videoSrc !== HERO_VIDEO_URL) {
+      console.warn('Falling back to primary cloud video stream');
+      setVideoSrc(HERO_VIDEO_URL);
+    }
+  };
+
   // Handle loaded metadata & initial playback mode
   const handleLoadedMetadata = () => {
     const video = videoRef.current;
     if (video) {
+      setIsVideoLoaded(true);
       setVideoDuration(video.duration || 10);
+      video.muted = true;
+      video.defaultMuted = true;
       if (isMobile) {
-        // Native continuous hardware playback at slow, majestic speed (0.55x)
-        video.playbackRate = 0.55;
-        video.muted = true;
+        // Native continuous hardware playback at smooth speed (0.7x)
+        video.playbackRate = 0.7;
         video.playsInline = true;
-        video.play().catch(() => {});
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            // Autoplay might be deferred until user interaction on some mobile devices
+          });
+        }
       } else {
         video.pause();
         video.currentTime = 0;
@@ -59,7 +85,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     }
   };
 
-  // On mobile: play continuous ping-pong video with smooth time updates
+  // On mobile: ensure autoplay and smooth loop
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -70,8 +96,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     }
 
     video.muted = true;
+    video.defaultMuted = true;
     video.playsInline = true;
-    video.playbackRate = 0.55;
+    video.playbackRate = 0.7;
+
+    const startPlay = () => {
+      if (video && video.paused) {
+        video.play().catch(() => {});
+      }
+    };
+
+    startPlay();
+
+    // Fallback: iOS Low Power Mode may restrict autoPlay until first touch
+    window.addEventListener('touchstart', startPlay, { once: true });
+    window.addEventListener('pointerdown', startPlay, { once: true });
+    window.addEventListener('scroll', startPlay, { once: true, passive: true });
 
     const handleTimeUpdate = () => {
       const cur = video.currentTime;
@@ -83,12 +123,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
-    video.play().catch(() => {});
 
     return () => {
+      window.removeEventListener('touchstart', startPlay);
+      window.removeEventListener('pointerdown', startPlay);
+      window.removeEventListener('scroll', startPlay);
       video.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [isMobile]);
+  }, [isMobile, videoSrc]);
 
   // Safe seek chaining using the `seeked` event
   const performNextSeek = useCallback(() => {
@@ -204,15 +246,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     >
       {/* 1. Background Video (paused + scrubbed on desktop, smooth automatic continuous scan on mobile) */}
       <video
+        key={videoSrc}
         ref={videoRef}
-        src={isMobile ? HERO_LOOP_VIDEO_URL : HERO_VIDEO_URL}
+        src={videoSrc}
         playsInline
         muted
         autoPlay={isMobile}
         loop={isMobile}
         preload="auto"
         onLoadedMetadata={handleLoadedMetadata}
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0 brightness-[0.85] contrast-[1.1]"
+        onError={handleVideoError}
+        className={`absolute inset-0 w-full h-full object-cover pointer-events-none z-0 brightness-[0.85] contrast-[1.1] transition-opacity duration-700 ${
+          isVideoLoaded ? 'opacity-100' : 'opacity-80'
+        }`}
       />
 
       {/* 2. Radial Dot Grid Overlay */}

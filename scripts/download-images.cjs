@@ -1,6 +1,7 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const REMOTE_BASE_URL = 'https://timi-portfolio.onrender.com';
 
@@ -34,10 +35,8 @@ const ASSETS = [
   '/images/projects/project-01/image-03.jpg'
 ];
 
-const VIDEO_ASSET = {
-  path: '/video/hero-loop.mp4',
-  remoteUrl: 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_083515_290e5a10-0b95-41af-a5e2-32b6389baa4d.mp4'
-};
+const CLOUDFRONT_VIDEO_URL =
+  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_083515_290e5a10-0b95-41af-a5e2-32b6389baa4d.mp4';
 
 function downloadFile(relPath) {
   return new Promise((resolve) => {
@@ -73,19 +72,38 @@ function downloadFile(relPath) {
   });
 }
 
+function ensurePingPongVideo() {
+  const videoDir = path.join(process.cwd(), 'public', 'video');
+  const videoPath = path.join(videoDir, 'hero-loop.mp4');
+
+  if (fs.existsSync(videoPath) && fs.statSync(videoPath).size > 100000) {
+    console.log(`[download-images] hero-loop.mp4 already exists (${fs.statSync(videoPath).size} bytes).`);
+    return;
+  }
+
+  fs.mkdirSync(videoDir, { recursive: true });
+
+  try {
+    console.log('[download-images] Generating seamless ping-pong loop with ffmpeg...');
+    execSync(
+      `ffmpeg -y -i "${CLOUDFRONT_VIDEO_URL}" -filter_complex "[0:v]reverse[r];[0:v][r]concat=n=2:v=1[out]" -map "[out]" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -movflags +faststart "${videoPath}"`,
+      { stdio: 'inherit' }
+    );
+    console.log('[download-images] hero-loop.mp4 generated successfully!');
+  } catch (err) {
+    console.warn('[download-images] FFmpeg not available or failed:', err.message);
+  }
+}
+
 async function main() {
   console.log('[download-images] Fetching project images for build...');
   for (const asset of ASSETS) {
     await downloadFile(asset);
   }
   
-  const videoPath = path.join(process.cwd(), 'public', VIDEO_ASSET.path);
-  if (!fs.existsSync(videoPath) || fs.statSync(videoPath).size === 0) {
-    console.log('[download-images] Downloading fallback video asset...');
-    await downloadFile(VIDEO_ASSET.path);
-  }
+  ensurePingPongVideo();
   
-  console.log('[download-images] Finished downloading all assets.');
+  console.log('[download-images] Finished downloading and preparing all assets.');
 }
 
 main().catch(err => {
