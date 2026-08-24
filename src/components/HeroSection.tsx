@@ -9,9 +9,8 @@ interface HeroSectionProps {
   onExploreClick: () => void;
 }
 
-const HERO_VIDEO_URL =
-  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_083515_290e5a10-0b95-41af-a5e2-32b6389baa4d.mp4';
 const HERO_LOOP_VIDEO_URL = '/video/hero-loop.mp4';
+const HERO_LOOP_MOBILE_VIDEO_URL = '/video/hero-loop-mobile.mp4';
 
 function getIsMobile(): boolean {
   if (typeof window === 'undefined') return false;
@@ -36,7 +35,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
   const [isMobile, setIsMobile] = useState<boolean>(getIsMobile);
   const [videoSrc, setVideoSrc] = useState<string>(() =>
-    getIsMobile() ? HERO_LOOP_VIDEO_URL : HERO_VIDEO_URL
+    getIsMobile() ? HERO_LOOP_MOBILE_VIDEO_URL : HERO_LOOP_VIDEO_URL
   );
   const [isVideoLoaded, setIsVideoLoaded] = useState<boolean>(false);
 
@@ -45,18 +44,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     const checkMobile = () => {
       const mobile = getIsMobile();
       setIsMobile(mobile);
-      setVideoSrc(mobile ? HERO_LOOP_VIDEO_URL : HERO_VIDEO_URL);
+      setVideoSrc(mobile ? HERO_LOOP_MOBILE_VIDEO_URL : HERO_LOOP_VIDEO_URL);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Handle video error (e.g. if local loop video 404s on remote host, fallback to cloudfront)
+  // Handle video error (e.g. if 720p fails, fallback to 1080p loop)
   const handleVideoError = () => {
-    if (videoSrc !== HERO_VIDEO_URL) {
-      console.warn('Falling back to primary cloud video stream');
-      setVideoSrc(HERO_VIDEO_URL);
+    if (videoSrc === HERO_LOOP_MOBILE_VIDEO_URL) {
+      console.warn('Falling back to 1080p hero loop');
+      setVideoSrc(HERO_LOOP_VIDEO_URL);
     }
   };
 
@@ -65,17 +64,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     const video = videoRef.current;
     if (video) {
       setIsVideoLoaded(true);
-      setVideoDuration(video.duration || 10);
+      setVideoDuration(video.duration || 8);
       video.muted = true;
       video.defaultMuted = true;
       if (isMobile) {
-        // Native continuous hardware playback at smooth speed (0.7x)
-        video.playbackRate = 0.7;
+        // Native continuous hardware playback at smooth slow speed (0.55x)
+        video.playbackRate = 0.55;
         video.playsInline = true;
         const playPromise = video.play();
         if (playPromise !== undefined) {
           playPromise.catch(() => {
-            // Autoplay might be deferred until user interaction on some mobile devices
+            // Autoplay deferred until user interaction on restricted devices
           });
         }
       } else {
@@ -98,7 +97,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     video.muted = true;
     video.defaultMuted = true;
     video.playsInline = true;
-    video.playbackRate = 0.7;
+    video.playbackRate = 0.55;
 
     const startPlay = () => {
       if (video && video.paused) {

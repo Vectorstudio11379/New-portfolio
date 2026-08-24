@@ -75,23 +75,36 @@ function downloadFile(relPath) {
 function ensurePingPongVideo() {
   const videoDir = path.join(process.cwd(), 'public', 'video');
   const videoPath = path.join(videoDir, 'hero-loop.mp4');
-
-  if (fs.existsSync(videoPath) && fs.statSync(videoPath).size > 100000) {
-    console.log(`[download-images] hero-loop.mp4 already exists (${fs.statSync(videoPath).size} bytes).`);
-    return;
-  }
+  const mobileVideoPath = path.join(videoDir, 'hero-loop-mobile.mp4');
 
   fs.mkdirSync(videoDir, { recursive: true });
 
+  const has1080p = fs.existsSync(videoPath) && fs.statSync(videoPath).size > 100000;
+  const has720p = fs.existsSync(mobileVideoPath) && fs.statSync(mobileVideoPath).size > 100000;
+
+  if (has1080p && has720p) {
+    console.log('[download-images] hero-loop videos already exist.');
+    return;
+  }
+
   try {
-    console.log('[download-images] Generating seamless ping-pong loop with ffmpeg...');
-    execSync(
-      `ffmpeg -y -i "${CLOUDFRONT_VIDEO_URL}" -filter_complex "[0:v]reverse[r];[0:v][r]concat=n=2:v=1[out]" -map "[out]" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -movflags +faststart "${videoPath}"`,
-      { stdio: 'inherit' }
-    );
-    console.log('[download-images] hero-loop.mp4 generated successfully!');
+    if (!has1080p) {
+      console.log('[download-images] Generating 1080p seamless ping-pong loop with ffmpeg...');
+      execSync(
+        `ffmpeg -y -i "${CLOUDFRONT_VIDEO_URL}" -filter_complex "[0:v]reverse[r];[0:v][r]concat=n=2:v=1[out]" -map "[out]" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -movflags +faststart "${videoPath}"`,
+        { stdio: 'inherit' }
+      );
+    }
+    if (!has720p) {
+      console.log('[download-images] Generating mobile 720p seamless ping-pong loop with ffmpeg...');
+      execSync(
+        `ffmpeg -y -i "${videoPath}" -vf "scale=1280:-2" -c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p -profile:v main -level 3.1 -movflags +faststart "${mobileVideoPath}"`,
+        { stdio: 'inherit' }
+      );
+    }
+    console.log('[download-images] hero-loop video assets verified successfully!');
   } catch (err) {
-    console.warn('[download-images] FFmpeg not available or failed:', err.message);
+    console.warn('[download-images] FFmpeg error:', err.message);
   }
 }
 
