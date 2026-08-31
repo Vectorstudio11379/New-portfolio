@@ -30,17 +30,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const lastMouseXRef = useRef<number | null>(null);
-  const targetTimeRef = useRef<number>(0);
-  const isSeekingRef = useRef<boolean>(false);
-  const [videoDuration, setVideoDuration] = useState<number>(8);
-  const [currentTimeDisplay, setCurrentTimeDisplay] = useState<string>('00:00.0');
+  const [videoDuration, setVideoDuration] = useState<number>(8.08);
 
   const [isMobile, setIsMobile] = useState<boolean>(getIsMobile);
   const [videoSrc, setVideoSrc] = useState<string>(() =>
     getIsMobile() ? HERO_LOOP_MOBILE_VIDEO_URL : HERO_LOOP_VIDEO_URL
   );
   const [isVideoLoaded, setIsVideoLoaded] = useState<boolean>(false);
+
+  const targetTimeRef = useRef<number>(2.02);
+  const smoothTimeRef = useRef<number>(2.02);
+  const [currentTimeDisplay, setCurrentTimeDisplay] = useState<string>('00:02.0');
 
   // Preload video as Blob to bypass byte-range header issues on iOS Safari and mobile WebKit
   useEffect(() => {
@@ -81,7 +81,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         }
       }
 
-      // If local assets fail (e.g. remote deployment without prebuilt assets), use CloudFront
       if (!isCancelled) {
         setVideoSrc(CLOUDFRONT_VIDEO_URL);
       }
@@ -108,56 +107,52 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Handle video error with robust fallback cascade
+  // Handle video error with fallback cascade
   const handleVideoError = () => {
     if (videoSrc === HERO_LOOP_MOBILE_VIDEO_URL) {
-      console.warn('Falling back to 1080p hero loop');
       setVideoSrc(HERO_LOOP_VIDEO_URL);
     } else if (videoSrc !== CLOUDFRONT_VIDEO_URL) {
-      console.warn('Falling back to primary CloudFront stream');
       setVideoSrc(CLOUDFRONT_VIDEO_URL);
     }
   };
 
-  // Handle loaded metadata & initial playback mode
+  // Handle loaded metadata & initial setup
   const handleLoadedMetadata = () => {
     const video = videoRef.current;
     if (video) {
       setIsVideoLoaded(true);
-      setVideoDuration(video.duration || 8);
+      const dur = video.duration || 8.08;
+      setVideoDuration(dur);
       video.muted = true;
       video.defaultMuted = true;
+
       if (isMobile) {
-        // Native continuous hardware playback at smooth slow speed (0.55x)
-        video.playbackRate = 0.55;
+        // Mobile continuous slow ping-pong loop (turns left and right slowly)
+        video.playbackRate = 0.5;
         video.playsInline = true;
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            // Autoplay deferred until user interaction on restricted devices
-          });
-        }
+        video.loop = true;
+        video.play().catch(() => {});
       } else {
+        // Desktop: paused, start facing center forward
         video.pause();
-        video.currentTime = 0;
+        const centerTime = dur > 4.5 ? dur / 4 : dur / 2;
+        video.currentTime = centerTime;
+        targetTimeRef.current = centerTime;
+        smoothTimeRef.current = centerTime;
       }
     }
   };
 
-  // On mobile: ensure autoplay and smooth loop
+  // 1. MOBILE CONTINUOUS LOOP HANDLING
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
-
-    if (!isMobile) {
-      video.pause();
-      return;
-    }
+    if (!video || !isMobile) return;
 
     video.muted = true;
     video.defaultMuted = true;
     video.playsInline = true;
-    video.playbackRate = 0.55;
+    video.loop = true;
+    video.playbackRate = 0.5;
 
     const startPlay = () => {
       if (video && video.paused) {
@@ -167,143 +162,81 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
     startPlay();
 
-    // Fallback: iOS Low Power Mode may restrict autoPlay until first touch
     window.addEventListener('touchstart', startPlay, { once: true });
     window.addEventListener('pointerdown', startPlay, { once: true });
     window.addEventListener('scroll', startPlay, { once: true, passive: true });
-
-    const handleTimeUpdate = () => {
-      const cur = video.currentTime;
-      const mins = Math.floor(cur / 60);
-      const secs = (cur % 60).toFixed(1);
-      setCurrentTimeDisplay(
-        `${mins.toString().padStart(2, '0')}:${secs.padStart(4, '0')}`
-      );
-    };
-
-    video.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
       window.removeEventListener('touchstart', startPlay);
       window.removeEventListener('pointerdown', startPlay);
       window.removeEventListener('scroll', startPlay);
-      video.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [isMobile, videoSrc]);
 
-  // Safe seek chaining using the `seeked` event
-  const performNextSeek = useCallback(() => {
-    if (!videoRef.current) {
-      isSeekingRef.current = false;
-      return;
-    }
-    const dur = videoRef.current.duration;
-    if (!dur || isNaN(dur)) {
-      isSeekingRef.current = false;
-      return;
-    }
-
-    // Clamp target time within video duration
-    const clampedTime = Math.max(0, Math.min(dur, targetTimeRef.current));
-
-    if (Math.abs(videoRef.current.currentTime - clampedTime) > 0.03) {
-      isSeekingRef.current = true;
-      videoRef.current.currentTime = clampedTime;
-      const mins = Math.floor(clampedTime / 60);
-      const secs = (clampedTime % 60).toFixed(1);
-      setCurrentTimeDisplay(
-        `${mins.toString().padStart(2, '0')}:${secs.padStart(4, '0')}`
-      );
-    } else {
-      isSeekingRef.current = false;
-    }
-  }, []);
-
-  const handleSeeked = useCallback(() => {
-    isSeekingRef.current = false;
-    performNextSeek();
-  }, [performNextSeek]);
-
-  // Mouse scrub handler (delta-based horizontal movement)
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!videoRef.current) return;
-      const dur = videoRef.current.duration || videoDuration || 10;
-      const currentX = e.clientX;
-
-      if (lastMouseXRef.current !== null) {
-        const deltaX = currentX - lastMouseXRef.current;
-        const sensitivity = 0.8; // Sensitivity factor from specs
-        // Calculate time delta relative to screen width
-        const timeChange = (deltaX / window.innerWidth) * dur * sensitivity * 2.2;
-        targetTimeRef.current = Math.max(
-          0,
-          Math.min(dur, targetTimeRef.current + timeChange)
-        );
-
-        if (!isSeekingRef.current) {
-          performNextSeek();
-        }
-      }
-      lastMouseXRef.current = currentX;
-    },
-    [videoDuration, performNextSeek]
-  );
-
-  const handleMouseLeave = () => {
-    lastMouseXRef.current = null;
-  };
-
-  // Touch scrub handler for mobile
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>) => {
-      if (!videoRef.current || e.touches.length === 0) return;
-      const dur = videoRef.current.duration || videoDuration || 10;
-      const currentX = e.touches[0].clientX;
-
-      if (lastMouseXRef.current !== null) {
-        const deltaX = currentX - lastMouseXRef.current;
-        const sensitivity = 1.0;
-        const timeChange = (deltaX / window.innerWidth) * dur * sensitivity * 2.0;
-        targetTimeRef.current = Math.max(
-          0,
-          Math.min(dur, targetTimeRef.current + timeChange)
-        );
-
-        if (!isSeekingRef.current) {
-          performNextSeek();
-        }
-      }
-      lastMouseXRef.current = currentX;
-    },
-    [videoDuration, performNextSeek]
-  );
-
-  const handleTouchEnd = () => {
-    lastMouseXRef.current = null;
-  };
-
+  // 2. DESKTOP SMOOTH CURSOR FOLLOWING VIA rAF & LERP
   useEffect(() => {
-    const video = videoRef.current;
-    if (video) {
-      video.addEventListener('seeked', handleSeeked);
-      return () => {
-        video.removeEventListener('seeked', handleSeeked);
-      };
-    }
-  }, [handleSeeked]);
+    if (isMobile) return;
+
+    let animId: number;
+
+    const updateFrame = () => {
+      const video = videoRef.current;
+      if (video && !video.seeking) {
+        const diff = targetTimeRef.current - smoothTimeRef.current;
+        if (Math.abs(diff) > 0.003) {
+          smoothTimeRef.current += diff * 0.14; // High-refresh fluid lerp
+          const clampedTime = Math.max(0, Math.min(video.duration || 8.08, smoothTimeRef.current));
+          if (Math.abs(video.currentTime - clampedTime) > 0.01) {
+            video.currentTime = clampedTime;
+            const mins = Math.floor(clampedTime / 60);
+            const secs = (clampedTime % 60).toFixed(1);
+            setCurrentTimeDisplay(
+              `${mins.toString().padStart(2, '0')}:${secs.padStart(4, '0')}`
+            );
+          }
+        }
+      }
+      animId = requestAnimationFrame(updateFrame);
+    };
+
+    animId = requestAnimationFrame(updateFrame);
+
+    // Global window mouse listener so the head tracks anywhere on the page
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      const video = videoRef.current;
+      const totalDur = video?.duration || 8.08;
+      // In original video, 0.0s is looking Left, ~2.02s is Center, ~4.04s is looking Right
+      const maxForwardTime = totalDur > 5 ? totalDur / 2 : totalDur;
+      const normalizedX = Math.max(0, Math.min(1, e.clientX / window.innerWidth));
+      targetTimeRef.current = normalizedX * maxForwardTime;
+    };
+
+    const handleGlobalMouseLeave = () => {
+      const video = videoRef.current;
+      const totalDur = video?.duration || 8.08;
+      const centerTime = totalDur > 5 ? totalDur / 4 : totalDur / 2;
+      targetTimeRef.current = centerTime; // Gracefully return to center view
+    };
+
+    window.addEventListener('mousemove', handleGlobalMouseMove, { passive: true });
+    document.addEventListener('mouseleave', handleGlobalMouseLeave);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseleave', handleGlobalMouseLeave);
+    };
+  }, [isMobile]);
 
   return (
     <section
       id="hero"
       ref={containerRef}
-      onMouseMove={!isMobile ? handleMouseMove : undefined}
-      onMouseLeave={!isMobile ? handleMouseLeave : undefined}
       className={`relative w-full h-screen h-[100dvh] overflow-hidden bg-black flex flex-col justify-between select-none ${
-        isMobile ? 'cursor-default' : 'cursor-ew-resize'
+        isMobile ? 'cursor-default' : 'cursor-default'
       }`}
     >
-      {/* 1. Background Video (paused + scrubbed on desktop, smooth automatic continuous scan on mobile) */}
+      {/* 1. Background Video (paused + smooth cursor tracking on desktop, smooth automatic continuous loop on mobile) */}
       <video
         key={videoSrc}
         ref={videoRef}
@@ -346,7 +279,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       >
         <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-[#b91f2a]/30 text-[11px] text-white/80 font-mono tracking-wider uppercase shadow-[0_0_15px_rgba(185,31,42,0.2)]">
           <MousePointer className="w-3 h-3 text-[#ff4d5a] animate-pulse" />
-          <span>Move cursor to scrub timeline</span>
+          <span>Move cursor to rotate 3D model</span>
           <span className="text-white font-bold pl-1 border-l border-white/20">
             {currentTimeDisplay}
           </span>

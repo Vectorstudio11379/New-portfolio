@@ -319,6 +319,7 @@ export const PROJECTS_DATA: Project[] = [
     description: "Designed and developed engaging and functional websites for 5th Element Media Group's diverse clientele, focusing on robust front-end architecture and seamless user experiences.",
     impact: 'Enhanced client engagement by +40% across a rich portfolio of client deployments.',
     images: [
+      '/images/projects/5th.png',
       '/images/projects/twist.png',
       '/images/projects/rebottle.png',
       '/images/projects/flower.png',
@@ -355,6 +356,9 @@ export const PROJECTS_DATA: Project[] = [
     description: "Managed and enhanced Beacon Corporate Realty's website, implemented SEO strategies, and created marketing videos and drone footage.",
     impact: 'Over 50% increase in prospective property investor inquiries and high-resolution visual tours.',
     images: [
+      '/images/projects/project-01/cover-01.jpg',
+      '/images/projects/project-01/cover-02.jpg',
+      '/images/projects/project-01/image-03.jpg',
       '/images/projects/project-01/beacon1.png',
       '/images/projects/project-01/beacon2.png',
       '/images/projects/project-01/beacon3.png',
